@@ -1,34 +1,51 @@
-from bs4 import BeautifulSoup
 import requests
-from config import LOGIN_URL, TABLE_URL, USERNAME, PASSWORD
+from config import BASE_URL, USERNAME, PASSWORD
 
-def login(session):
-
-    r = session.get(LOGIN_URL)
-
-    payload = {
-        "username": USERNAME,
-        "password": PASSWORD
-    }
-
-    session.post(LOGIN_URL, data=payload)
-
-# Testovací funkce pro ověření přihlášení
-'''
-def test_login():
-    print("Zkousim prihlaseni")
-    session = requests.Session()
-    login(session)
+def login(session: requests.Session):
+    # globalni hlavicky pro cely seassion
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:148.0) Gecko/20100101 Firefox/148.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "cs,sk;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Connection": "keep-alive"
+    })
     
-    test_response = session.get(TABLE_URL)
-    soup = BeautifulSoup(test_response.text, "html.parser")
-    test_text = soup.find("td", id="prihlasen")
+    session.get(f"{BASE_URL}/auth/?lang=cz")
     
-    if test_text:
-        print("funguje")
-    else:
-        print("nefunguje")
-        
-if __name__ == "__main__":
-    test_login()
-'''
+    # sends data for authentization
+    session.post(
+        f"{BASE_URL}/system/ajax_handler.pl",
+        data={
+            "login": USERNAME,
+            "password": PASSWORD,
+            "lang": "cz"
+        },
+        headers={
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": f"{BASE_URL}/system/login.pl?lang=cz"
+        }
+    )
+    
+    # user login into site, should return cookie UISAuth
+    response = session.post(
+        f"{BASE_URL}/system/login.pl",
+        data={
+            "lang": "cz",
+            "login_hidden": "1",
+            "destination": "/auth/?lang=cz",
+            "auth_id_hidden": "0",
+            "auth_2fa_type": "no",
+            "credential_0": USERNAME,
+            "credential_1": PASSWORD
+        },
+        headers={
+            "Referer": f"{BASE_URL}/auth/?lang=cz"
+        },
+        allow_redirects=True
+    )
+
+    cookies = session.cookies.get_dict()
+    if "UISAuth" not in cookies:
+        raise Exception("Login selhal – chybí UISAuth cookie")
+
+    print("Přihlášení proběhlo úspěšně")

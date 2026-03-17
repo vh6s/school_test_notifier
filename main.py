@@ -13,6 +13,13 @@ start = time.time()
 while time.time() - start < 7200:
     try:
         response = session.get(TABLE_URL, timeout=10)
+        
+        # check jestli session expirovala, pokud ano -> znovu se prihlasi
+        if response.status_code == 403:
+            print(f"[{time.strftime('%H:%M:%S')}] Session expirovala, login znovu...")
+            login(session)
+            continue
+        
         response.raise_for_status()
 
         if parse_tests(response.text):
